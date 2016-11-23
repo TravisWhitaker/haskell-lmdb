@@ -24,6 +24,7 @@ module Database.LMDB.TxM (
   ) where
 
 import Control.Monad.Free.Church
+import Control.Monad.IO.Class
 
 import Prelude hiding (drop)
 
@@ -36,7 +37,7 @@ class TxInterp i where
     type TxCursor i :: * -> * -> *
     type TxMove i   :: * -> *
     type TxMonad i  :: (* -> *) -> * -> *
-    interpTxT :: TxT i m a -> (TxMonad i) m a
+    interpTxT :: MonadIO m => TxT i m a -> (TxMonad i) m a
 
 data TxOp i m x where
     Lift        :: Monad m => m a -> (a -> x) -> TxOp i m x
