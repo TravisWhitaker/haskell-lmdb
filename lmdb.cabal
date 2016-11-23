@@ -31,8 +31,16 @@ Library
   default-language: Haskell2010
   Build-Depends:    base (>= 4.6 && < 5)
                   , array
+                  , data-default-class
+                  , deepseq
+                  , free
   Build-Tools:      hsc2hs
-  Exposed-Modules:  Database.LMDB.Raw
+  Exposed-Modules:  Database.LMDB
+                    Database.LMDB.Error
+                    Database.LMDB.Internal.Raw
+                    Database.LMDB.Stowable
+                    Database.LMDB.TxM
+                    Database.LMDB.Version
   Other-Modules:
   extra-libraries: lmdb
   ghc-options: -Wall

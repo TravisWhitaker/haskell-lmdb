@@ -1,4 +1,8 @@
-{-# LANGUAGE ForeignFunctionInterface, DeriveDataTypeable #-}
+{-# LANGUAGE ForeignFunctionInterface
+           , DeriveAnyClass
+           , DeriveDataTypeable
+           , DeriveGeneric
+           #-}
 
 -- | This module is a thin wrapper above lmdb.h.
 -- 
@@ -34,7 +38,7 @@
 -- * user-defined relocation functions 
 -- * MDB_MULTIPLE is not currently supported (todo)
 -- 
-module Database.LMDB.Raw
+module Database.LMDB.Internal.Raw
     ( LMDB_Version(..), lmdb_version, lmdb_dyn_version
     , LMDB_Error(..), MDB_ErrCode(..)
 
@@ -133,7 +137,7 @@ module Database.LMDB.Raw
 
 import Foreign
 import Foreign.C
-import Control.Applicative
+import Control.DeepSeq
 import Control.Monad
 import Control.Exception
 import Control.Concurrent 
@@ -144,6 +148,7 @@ import Data.Typeable
 import Data.Function (on)
 import Data.Maybe (isNothing)
 import Data.IORef
+import GHC.Generics
 
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 
@@ -293,7 +298,7 @@ data LMDB_Error = LMDB_Error
     { e_context     :: String 
     , e_description :: String 
     , e_code        :: Either Int MDB_ErrCode
-    } deriving (Eq, Ord, Show, Typeable)
+    } deriving (Eq, Ord, Read, Show, Generic, NFData, Typeable)
 instance Exception LMDB_Error
 
 -- | Opaque structure for LMDB environment.
@@ -561,7 +566,7 @@ data MDB_ErrCode
     | MDB_BAD_RSLOT
     | MDB_BAD_TXN
     | MDB_BAD_VALSIZE
-    deriving (Eq, Ord, Bounded, A.Ix, Show)
+    deriving (Eq, Ord, Bounded, A.Ix, Read, Show, Generic, NFData)
 
 errCodes :: [(MDB_ErrCode, Int)]
 errCodes =
