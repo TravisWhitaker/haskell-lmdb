@@ -1,4 +1,6 @@
 resolver: lts-7.10
+ghc-options:
+    "*": "-Wall"
 packages:
 - '.'
 extra-deps: []

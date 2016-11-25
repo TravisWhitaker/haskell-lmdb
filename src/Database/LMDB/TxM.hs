@@ -40,18 +40,18 @@ class TxInterp i where
     interpTxT :: MonadIO m => TxT i m a -> (TxMonad i) m a
 
 data TxOp i m x where
-    Lift        :: Monad m => m a -> (a -> x) -> TxOp i m x
-    Drop        :: TxInterp i => (TxDB i) k v -> x -> TxOp i m x
-    Clear       :: TxInterp i => (TxDB i) k v -> x -> TxOp i m x
+    Lift        :: Monad m                              => m a -> (a -> x) -> TxOp i m x
+    Drop        :: TxInterp i                           => (TxDB i) k v -> x -> TxOp i m x
+    Clear       :: TxInterp i                           => (TxDB i) k v -> x -> TxOp i m x
     Get         :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> ((Maybe v) -> x) -> TxOp i m x
     Put         :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
     Upsert      :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
     Del         :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> (Bool -> x) -> TxOp i m x
-    OpenCursor  :: TxInterp i => (TxDB i) k v -> (((TxCursor i) k v) -> x) -> TxOp i m x
-    MoveCursor  :: TxInterp i => (TxCursor i) k v -> (TxMove i) k -> ((Maybe (Pair k v)) -> x) -> TxOp i m x
-    PutCursor   :: TxInterp i => (TxCursor i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
-    DelCursor   :: TxInterp i => (TxCursor i) k v -> k -> x -> TxOp i m x
-    CloseCursor :: TxInterp i => (TxCursor i) k v -> x -> TxOp i m x
+    OpenCursor  :: (TxInterp i)                         => (TxDB i) k v -> (((TxCursor i) k v) -> x) -> TxOp i m x
+    MoveCursor  :: (TxInterp i, Stowable k, Stowable v) => (TxCursor i) k v -> (TxMove i) k -> ((Maybe (Pair k v)) -> x) -> TxOp i m x
+    PutCursor   :: (TxInterp i, Stowable k, Stowable v) => (TxCursor i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
+    DelCursor   :: (TxInterp i, Stowable k)             => (TxCursor i) k v -> k -> x -> TxOp i m x
+    CloseCursor :: (TxInterp i)                         => (TxCursor i) k v -> x -> TxOp i m x
     Abort       :: TxOp i m x
 
 instance Functor (TxOp i m) where
@@ -95,13 +95,13 @@ del db k = liftF $ Del db k id
 openCursor :: TxInterp i => (TxDB i) k v -> TxT i m ((TxCursor i) k v)
 openCursor db = liftF $ OpenCursor db id
 
-moveCursor :: TxInterp i => (TxCursor i) k v -> (TxMove i) k -> TxT i m (Maybe (Pair k v))
+moveCursor :: (TxInterp i, Stowable k, Stowable v) => (TxCursor i) k v -> (TxMove i) k -> TxT i m (Maybe (Pair k v))
 moveCursor c m = liftF $ MoveCursor c m id
 
-putCursor :: TxInterp i => (TxCursor i) k v -> k -> v -> TxT i m Bool
+putCursor :: (TxInterp i, Stowable k, Stowable v) => (TxCursor i) k v -> k -> v -> TxT i m Bool
 putCursor c k v = liftF $ PutCursor c k v id
 
-delCursor :: TxInterp i => (TxCursor i) k v -> k -> TxT i m ()
+delCursor :: (TxInterp i, Stowable k) => (TxCursor i) k v -> k -> TxT i m ()
 delCursor c k = liftF $ DelCursor c k ()
 
 closeCursor :: TxInterp i => (TxCursor i) k v -> TxT i m ()

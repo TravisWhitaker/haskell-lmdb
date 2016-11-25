@@ -1,14 +1,14 @@
 Name: lmdb
 Version: 0.3.0
-Synopsis: Lightning MDB bindings 
+Synopsis: Lightning MDB bindings
 Category: Database
 Description:
   LMDB is a read-optimized Berkeley DB replacement developed by Symas
-  for the OpenLDAP project. LMDB has impressive performance characteristics 
+  for the OpenLDAP project. LMDB has impressive performance characteristics
   and a friendly BSD-style OpenLDAP license. See <http://symas.com/mdb/>.
   .
-  This library has Haskell bindings to the LMDB library. You must install 
-  the lmdb development files before installing this library, 
+  This library has Haskell bindings to the LMDB library. You must install
+  the lmdb development files before installing this library,
   e.g. `sudo apt-get install liblmdb-dev` works for Ubuntu 14.04.
   .
 
@@ -34,6 +34,7 @@ Library
                   , data-default-class
                   , deepseq
                   , free
+                  , mtl
   Build-Tools:      hsc2hs
   Exposed-Modules:  Database.LMDB
                     Database.LMDB.Error
@@ -41,6 +42,7 @@ Library
                     Database.LMDB.Stowable
                     Database.LMDB.TxM
                     Database.LMDB.Version
+                    Database.LMDB.Interpreter.LMDB
   Other-Modules:
   extra-libraries: lmdb
   ghc-options: -Wall
