@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns
            , GADTs
            , TypeFamilies
+           , ConstraintKinds
            #-}
 
 module Database.LMDB.TxM (
@@ -30,6 +31,8 @@ import Prelude hiding (drop)
 
 import Database.LMDB.Stowable (Stowable)
 
+import GHC.Exts (Constraint)
+
 data Pair k v = Pair !k !v
 
 class TxInterp i where
@@ -37,7 +40,8 @@ class TxInterp i where
     type TxCursor i :: * -> * -> *
     type TxMove i   :: * -> *
     type TxMonad i  :: (* -> *) -> * -> *
-    interpTxT :: MonadIO m => TxT i m a -> (TxMonad i) m a
+    type TxConstraint i :: (* -> *) -> Constraint
+    interpTxT :: TxConstraint i m => TxT i m a -> (TxMonad i) m a
 
 data TxOp i m x where
     Lift        :: Monad m                              => m a -> (a -> x) -> TxOp i m x

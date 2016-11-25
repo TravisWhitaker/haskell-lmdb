@@ -22,10 +22,11 @@ newtype CursorW payload k v = CursorW payload
 newtype MoveW   payload k   = MoveW   payload
 
 instance TxInterp LMDB where
-    type TxDB     LMDB = DBW     MDB_dbi
-    type TxCursor LMDB = CursorW MDB_cursor
-    type TxMove   LMDB = MoveW   MDB_cursor_op
-    type TxMonad  LMDB = ReaderT (MDB_txn, [MDB_WriteFlag])
+    type TxDB         LMDB = DBW     MDB_dbi
+    type TxCursor     LMDB = CursorW MDB_cursor
+    type TxMove       LMDB = MoveW   MDB_cursor_op
+    type TxMonad      LMDB = ReaderT (MDB_txn, [MDB_WriteFlag])
+    type TxConstraint LMDB = MonadIO
 
     interpTxT tree = runF tree return algebra
       where
