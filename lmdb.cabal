@@ -35,6 +35,10 @@ Library
                   , deepseq
                   , free
                   , mtl
+                  , exceptions
+                  , filepath
+                  , text
+                  , bytestring
   Build-Tools:      hsc2hs
   Exposed-Modules:  Database.LMDB
                     Database.LMDB.Error
@@ -43,6 +47,7 @@ Library
                     Database.LMDB.TxM
                     Database.LMDB.Version
                     Database.LMDB.Interpreter.LMDB
+                    Database.LMDB.Types
   Other-Modules:
   extra-libraries: lmdb
   ghc-options: -Wall
@@ -50,3 +55,16 @@ Library
                -fwarn-identities
                -fwarn-missing-signatures
                -fno-warn-unused-do-bind
+
+Test-Suite sanity
+    type:               exitcode-stdio-1.0
+    main-is:            tests/sanity/Main.hs
+    build-depends:      base
+                      , lmdb
+                      , mtl
+                      , bytestring
+                      , directory
+                      , QuickCheck
+                      , threads
+    default-language:   Haskell2010
+    ghc-options:        -threaded

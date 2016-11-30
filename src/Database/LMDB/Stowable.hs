@@ -12,6 +12,8 @@ import Foreign.Storable
 
 import Database.LMDB.Internal.Raw
 
+import Data.ByteString
+
 class NFData a => Stowable a where
     get :: MDB_val -> IO a
     default get :: Storable a => MDB_val -> IO a
@@ -21,3 +23,8 @@ class NFData a => Stowable a where
     put x f = allocaBytes (sizeOf x) (\p -> f (MDB_val (fromIntegral (sizeOf x)) p))
 
 -- more instances
+
+instance Stowable ByteString where
+    get (MDB_val size ptr) = packCStringLen (castPtr ptr, fromIntegral size)
+    put bstr cont = bstr `useAsCStringLen` \(ptr, size) ->
+        cont $ fromIntegral size `MDB_val` castPtr ptr
