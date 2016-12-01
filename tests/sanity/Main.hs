@@ -32,6 +32,8 @@ main = do
                     get dbi (bs k)
 
                 in test command (Just (bs v)) env
+
+            quickCheck $ \key -> Data.ByteString.length (pack key) >= 0
     res' <- res
     result res'
 

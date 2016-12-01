@@ -20,6 +20,7 @@ module Database.LMDB (
   , closeDB
   , def
   , withEnv
+  , withReadOnlyEnv
   , withDB
   ) where
 
@@ -30,6 +31,7 @@ import Data.Default.Class
 
 import Database.LMDB.Types
 
+-- * Continuation-style access to environment (read-write).
 withEnv
     :: MonadIO m
     => MonadMask m
@@ -41,6 +43,21 @@ withEnv
 withEnv cfg path size action = do
     bracket
         (liftIO $ initReadWriteEnv cfg path size)
+        (liftIO . closeEnv)
+        (runReaderT action)
+
+-- * Continuation-style access to environment (read-write).
+withReadOnlyEnv
+    :: MonadIO m
+    => MonadMask m
+    => EnvConfig
+    -> FilePath
+    -> Int
+    -> ReaderT (Env 'ReadOnly) m a
+    -> m a
+withReadOnlyEnv cfg path size action = do
+    bracket
+        (liftIO $ initReadOnlyEnv cfg path size)
         (liftIO . closeEnv)
         (runReaderT action)
 

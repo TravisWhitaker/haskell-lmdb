@@ -25,13 +25,12 @@ module Database.LMDB.TxM (
   ) where
 
 import Control.Monad.Free.Church
-import Control.Monad.IO.Class
-
-import Prelude hiding (drop)
 
 import Database.LMDB.Stowable (Stowable)
 
 import GHC.Exts (Constraint)
+
+import Prelude hiding (drop)
 
 data Pair k v = Pair !k !v
 

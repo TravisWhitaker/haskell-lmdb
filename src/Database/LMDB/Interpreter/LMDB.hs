@@ -5,7 +5,6 @@
 
 module Database.LMDB.Interpreter.LMDB where
 
-import Control.Monad.Catch
 import Control.Monad.Free.Church
 import Control.Monad.Reader
 
@@ -17,34 +16,15 @@ import Database.LMDB.TxM
 import Foreign.Storable
 import Foreign.Marshal.Alloc
 
-import System.FilePath
-
+-- * Type label for main lmbd-DSL interpreter.
 data LMDB
 
-newtype DBW     payload k v = DBW     payload
+-- * Wrappers for cursor and cursor movement.
 newtype CursorW payload k v = CursorW payload
 newtype MoveW   payload k   = MoveW   payload
 
--- openEnvironment
---     :: MonadMask m
---     => MonadIO m
---     => String
---     -> [MDB_WriteFlag]
---     -> [MDB_EnvFlag]
---     -> ReaderT (MDB_env, [MDB_WriteFlag]) m a
---     -> m a
--- openEnvironment name flags dbFlags action = do
---     bracket open close (\env -> runReaderT action (env, flags))
---   where
---     close = liftIO . mdb_env_close
---     open = liftIO $ do
---         env <- mdb_env_create
---         env `mdb_env_set_mapsize`   (1024 * 1024 * 1024)
---         env `mdb_env_set_maxreaders` 20000
---         env `mdb_env_set_maxdbs`     64
---         mdb_env_open env name dbFlags
---         return env
-
+-- * Main way to interpret DSL in "battle" situation.
+--   FIXME(kir): should it be a method of TxInterp, too?
 withTransaction
     :: (Env mode, [MDB_WriteFlag])
     -> TxT LMDB IO a
@@ -93,6 +73,8 @@ instance TxInterp LMDB where
               Upsert (DB db) key value continue -> do
                 key'    <- encode key
                 value'  <- encode value
+                -- FIXME(kir): I'm not sure about that flag.
+                -- TODO: write tests
                 let flags' = MDB_APPENDDUP : flags
                 success <- liftIO $ mdb_put' (c flags') trans db key' value'
                 continue success
@@ -102,6 +84,7 @@ instance TxInterp LMDB where
                 success <- liftIO $ mdb_del' trans db key' Nothing
                 continue success
 
+              -- TODO: Understabd and write tests.
               OpenCursor (DB db) consume -> do
                 cursor <- liftIO $ mdb_cursor_open' trans db
                 consume (CursorW cursor)
