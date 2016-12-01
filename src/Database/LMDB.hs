@@ -47,12 +47,12 @@ withEnv cfg path size action = do
 withDB
     :: MonadIO m
     => MonadMask m
-    => Env mode
+    => DBConfig
     -> DBName
-    -> DBConfig
+    -> Env mode
     -> ReaderT (DB k v) m a
     -> m a
-withDB e n c action = do
+withDB c n e action = do
     bracket
         (liftIO $ openDB e n c)
         (liftIO . closeDB e)

@@ -50,7 +50,7 @@ withTransaction
     -> TxT LMDB IO a
     -> IO a
 withTransaction (Env env, flags) action = do
-    txn <- mdb_txn_begin env Nothing True
+    txn <- mdb_txn_begin env Nothing False
     res <- interpTxT action `runReaderT` (txn, flags)
     mdb_txn_commit txn
     return res

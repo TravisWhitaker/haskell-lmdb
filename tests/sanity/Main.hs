@@ -10,25 +10,30 @@ import Database.LMDB.TxM
 import Database.LMDB
 
 import Data.ByteString
+import Data.Monoid
 
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
 
 bs :: ByteString -> ByteString
-bs = id
+bs = ("bs" <>)
 
 main :: IO ()
 main = do
-    let envCfg = def { noLock = True }
-    withEnv envCfg "database" (1024 * 1024) $ ReaderT $ \env ->
-        withDB env (Named "other") def      $ ReaderT $ \dbi -> do
+    (_, res) <- forkOS $
+        withEnv def "database" (1024 * 1024) $ ReaderT $ \env ->
+        withDB  def (Named "other") env      $ ReaderT $ \dbi -> do
             quickCheck $ \key value ->
                 let
+                  k = pack key
+                  v = pack value
                   command = do
-                    put    dbi (bs key) (bs value)
-                    get    dbi (bs key)
+                    _ <- put dbi (bs k) (bs v)
+                    get dbi (bs k)
 
-                in test command (Just value) env
+                in test command (Just (bs v)) env
+    res' <- res
+    result res'
 
 test
     :: Eq a
@@ -36,10 +41,7 @@ test
     -> a
     -> Env mode
     -> Property
-test command result env' =
+test command expected env' =
     monadicIO $ do
         res <- run $ withTransaction (env', []) command
-        assert False -- (res /= result)
-
-instance Arbitrary ByteString where
-    arbitrary = pack <$> arbitrary
+        assert (res == expected)
