@@ -23,6 +23,7 @@ main = do
     (_, res) <- forkOS $
         withEnv def "database" (1024 * 1024) $ ReaderT $ \env ->
         withDB  def (Named "other") env      $ ReaderT $ \dbi -> do
+            -- * Sanity check: read after write.
             quickCheck $ \key value ->
                 let
                   k = pack key
@@ -33,10 +34,13 @@ main = do
 
                 in test command (Just (bs v)) env
 
-            quickCheck $ \key -> Data.ByteString.length (pack key) >= 0
+            -- * Sanity check is slow, but this is not.
+            quickCheck $ \key ->
+                Data.ByteString.length (pack key) >= 0
     res' <- res
     result res'
 
+-- * Run given DSL expression in a transaction.
 test
     :: Eq a
     => TxT LMDB IO a

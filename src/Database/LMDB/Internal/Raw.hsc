@@ -131,6 +131,8 @@ module Database.LMDB.Internal.Raw
 
     , withKVPtrs
     , withKVOptPtrs
+    , setFlag
+    , clearFlag
     ) where
 
 #include <lmdb.h>
@@ -487,10 +489,20 @@ writeFlagsArray = A.accumArray (.|.) 0 (minBound,maxBound) writeFlags
 -- from a list on a per-write basis.
 newtype MDB_WriteFlags = MDB_WriteFlags CUInt
 
--- | compile a list of write flags. 
+-- | compile a list of write flags.
 compileWriteFlags :: [MDB_WriteFlag] -> MDB_WriteFlags
 compileWriteFlags = MDB_WriteFlags . L.foldl' addWF 0 where
     addWF n wf = n .|. fromIntegral (writeFlagsArray A.! wf)
+
+setFlag, clearFlag :: MDB_WriteFlags -> MDB_WriteFlag -> MDB_WriteFlags
+MDB_WriteFlags flags `setFlag`   flag
+    = MDB_WriteFlags
+    $ fromIntegral
+    $ (writeFlagsArray A.! flag) .|. fromIntegral flags
+MDB_WriteFlags flags `clearFlag` flag
+    = MDB_WriteFlags
+    $ fromIntegral
+    $ complement (writeFlagsArray A.! flag) .&. fromIntegral flags
 
 data MDB_cursor_op
     = MDB_FIRST

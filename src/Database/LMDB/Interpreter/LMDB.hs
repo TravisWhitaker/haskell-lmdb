@@ -31,7 +31,7 @@ withTransaction
     -> IO a
 withTransaction (Env env, flags) action = do
     txn <- mdb_txn_begin env Nothing False
-    res <- interpTxT action `runReaderT` (txn, flags)
+    res <- interpTxT action `runReaderT` (txn, compileWriteFlags flags)
     mdb_txn_commit txn
     return res
 
@@ -39,7 +39,7 @@ instance TxInterp LMDB where
     type TxDB         LMDB = DB
     type TxCursor     LMDB = CursorW MDB_cursor'
     type TxMove       LMDB = MoveW   MDB_cursor_op
-    type TxMonad      LMDB = ReaderT (MDB_txn, [MDB_WriteFlag])
+    type TxMonad      LMDB = ReaderT (MDB_txn, MDB_WriteFlags)
     type TxConstraint LMDB = MonadIO
 
     interpTxT tree = runF tree return algebra
@@ -67,7 +67,7 @@ instance TxInterp LMDB where
               Put (DB db) key value continue -> do
                 key'    <- encode key
                 value'  <- encode value
-                success <- liftIO $ mdb_put' (c flags) trans db key' value'
+                success <- liftIO $ mdb_put' flags trans db key' value'
                 continue success
 
               Upsert (DB db) key value continue -> do
@@ -75,8 +75,8 @@ instance TxInterp LMDB where
                 value'  <- encode value
                 -- FIXME(kir): I'm not sure about that flag.
                 -- TODO: write tests
-                let flags' = MDB_APPENDDUP : flags
-                success <- liftIO $ mdb_put' (c flags') trans db key' value'
+                let flags' = flags `setFlag` MDB_APPENDDUP
+                success <- liftIO $ mdb_put' flags' trans db key' value'
                 continue success
 
               Del (DB db) key continue -> do
@@ -84,7 +84,7 @@ instance TxInterp LMDB where
                 success <- liftIO $ mdb_del' trans db key' Nothing
                 continue success
 
-              -- TODO: Understabd and write tests.
+              -- TODO: Understand cursors and write tests.
               OpenCursor (DB db) consume -> do
                 cursor <- liftIO $ mdb_cursor_open' trans db
                 consume (CursorW cursor)
@@ -108,11 +108,11 @@ instance TxInterp LMDB where
               PutCursor (CursorW cursor) key value continue -> do
                 key' <- encode key
                 val' <- encode value
-                success <- liftIO $ mdb_cursor_put' (c flags) cursor key' val'
+                success <- liftIO $ mdb_cursor_put' flags cursor key' val'
                 continue success
 
               DelCursor (CursorW cursor) _key next -> do
-                liftIO $ mdb_cursor_del' (c flags) cursor
+                liftIO $ mdb_cursor_del' flags cursor
                 next
 
               CloseCursor (CursorW cursor) next -> do
@@ -122,6 +122,5 @@ instance TxInterp LMDB where
               Abort -> do
                 error "is there any meaning here?"
 
-        c = compileWriteFlags
         encode thing = liftIO $ S.put thing return
         decode thing = liftIO $ S.get thing
