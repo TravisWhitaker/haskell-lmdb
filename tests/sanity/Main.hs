@@ -42,21 +42,23 @@ main = do
                 
             quickCheck $ \key vals ->
                 let
-                  k  =     pack key
-                  vs = map pack vals
+                  k  =             pack key
+                  vs = take 5 (map pack vals)
                   command = do
-                    forM_ (take 5 vs) $ \v ->
+                    forM_ vs $ \v ->
                         put dbi (bs k) (bs v)
                         
                     gets dbi k
                     
-                in test sort command (map bs vs)  env
+                in test sort command (map pack vals) env
     res' <- res
     result res'
 
 -- * Run given DSL expression in a transaction.
 test
     :: Eq b
+    => Show b
+    => Show a
     => (a -> b)
     -> TxT LMDB IO a
     -> a
@@ -65,4 +67,6 @@ test
 test project command expected env' =
     monadicIO $ do
         res <- run $ withTransaction (env', []) command
+        run $ print ("res", res)
+        run $ print ("exp", expected)
         assert (project res == project expected)
