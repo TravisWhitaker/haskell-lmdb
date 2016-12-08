@@ -7,6 +7,7 @@ module Database.LMDB.Interpreter.LMDB where
 
 import Control.Monad.Free.Church
 import Control.Monad.Reader
+import Control.Monad.Catch
 
 import Database.LMDB.Internal.Raw
 import Database.LMDB.Types
@@ -26,14 +27,16 @@ newtype MoveW   payload k   = MoveW   payload
 -- * Main way to interpret DSL in "battle" situation.
 --   FIXME(kir): should it be a method of TxInterp, too?
 withTransaction
-    :: (Env mode, [MDB_WriteFlag])
-    -> TxT LMDB IO a
-    -> IO a
+    :: MonadIO m
+    => MonadMask m
+    => (Env mode, [MDB_WriteFlag])
+    -> TxT LMDB m a
+    -> m a
 withTransaction (Env env, flags) action = do
-    txn <- mdb_txn_begin env Nothing False
-    res <- interpTxT action `runReaderT` (txn, compileWriteFlags flags)
-    mdb_txn_commit txn
-    return res
+    bracket
+        (liftIO $ mdb_txn_begin env Nothing False)
+        (liftIO . mdb_txn_commit)
+        (\txn -> interpTxT action `runReaderT` (txn, compileWriteFlags flags))
 
 instance TxInterp LMDB where
     type TxDB         LMDB = DB
