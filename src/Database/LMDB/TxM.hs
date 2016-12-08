@@ -8,11 +8,13 @@ module Database.LMDB.TxM (
     Pair(..)
   , TxInterp(..)
   , TxOp(..)
+  , TxMove(..)
   , TxT
   , liftTxT
   , drop
   , clear
   , get
+  , gets
   , put
   , upsert
   , del
@@ -32,12 +34,14 @@ import GHC.Exts (Constraint)
 
 import Prelude hiding (drop)
 
+import Debug.Trace
+
 data Pair k v = Pair !k !v
+    deriving (Show)
 
 class TxInterp i where
     type TxDB i     :: * -> * -> *
     type TxCursor i :: * -> * -> *
-    type TxMove i   :: * -> *
     type TxMonad i  :: (* -> *) -> * -> *
     type TxConstraint i :: (* -> *) -> Constraint
     interpTxT :: TxConstraint i m => TxT i m a -> (TxMonad i) m a
@@ -56,6 +60,11 @@ data TxOp i m x where
     DelCursor   :: (TxInterp i, Stowable k)             => (TxCursor i) k v -> k -> x -> TxOp i m x
     CloseCursor :: (TxInterp i)                         => (TxCursor i) k v -> x -> TxOp i m x
     Abort       :: TxOp i m x
+
+data TxMove i k
+    = MoveTo k
+    | MoveNext
+    | MoveGetItem
 
 instance Functor (TxOp i m) where
     fmap f (Lift m x)          = Lift m (f . x)
@@ -85,6 +94,29 @@ clear db = liftF $ Clear db ()
 
 get :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> TxT i m (Maybe v)
 get db k = liftF $ Get db k id
+
+gets
+    :: (TxInterp i, Stowable k, Stowable v, Show k, Show v)
+    => TxDB i k v -> k -> TxT i m [v]
+gets db k = do
+    cur <- openCursor db
+    mp  <- moveCursor cur (MoveTo k)
+    case mp of
+      Nothing ->
+        return []
+      Just (Pair k v) -> do
+        vs <- retrieveAllAt cur
+        return (v : vs)
+  where
+    retrieveAllAt cur = do
+        maybePair <- moveCursor cur MoveNext
+        trace (show maybePair) $
+            case maybePair of
+              Nothing -> do
+                return []
+              Just (Pair _ v) -> do
+                vs <- retrieveAllAt cur
+                return (v : vs)
 
 put :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> TxT i m Bool
 put db k v = liftF $ Put db k v id

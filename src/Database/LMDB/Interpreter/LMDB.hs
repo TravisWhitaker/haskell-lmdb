@@ -7,7 +7,6 @@ module Database.LMDB.Interpreter.LMDB where
 
 import Control.Monad.Free.Church
 import Control.Monad.Reader
-import Control.Monad.Catch
 
 import Database.LMDB.Internal.Raw
 import Database.LMDB.Types
@@ -27,21 +26,18 @@ newtype MoveW   payload k   = MoveW   payload
 -- * Main way to interpret DSL in "battle" situation.
 --   FIXME(kir): should it be a method of TxInterp, too?
 withTransaction
-    :: MonadIO m
-    => MonadMask m
-    => (Env mode, [MDB_WriteFlag])
-    -> TxT LMDB m a
-    -> m a
+    :: (Env mode, [MDB_WriteFlag])
+    -> TxT LMDB IO a
+    -> IO a
 withTransaction (Env env, flags) action = do
-    bracket
-        (liftIO $ mdb_txn_begin env Nothing False)
-        (liftIO . mdb_txn_commit)
-        (\txn -> interpTxT action `runReaderT` (txn, compileWriteFlags flags))
+    txn <- mdb_txn_begin env Nothing False
+    res <- interpTxT action `runReaderT` (txn, compileWriteFlags flags)
+    mdb_txn_commit txn
+    return res
 
 instance TxInterp LMDB where
     type TxDB         LMDB = DB
     type TxCursor     LMDB = CursorW MDB_cursor'
-    type TxMove       LMDB = MoveW   MDB_cursor_op
     type TxMonad      LMDB = ReaderT (MDB_txn, MDB_WriteFlags)
     type TxConstraint LMDB = MonadIO
 
@@ -92,11 +88,21 @@ instance TxInterp LMDB where
                 cursor <- liftIO $ mdb_cursor_open' trans db
                 consume (CursorW cursor)
 
-              MoveCursor (CursorW cursor) (MoveW move) consumePair -> do
+              MoveCursor (CursorW cursor) move consumePair -> do
                 maybePair <- liftIO $
                     alloca $ \keyPtr ->
                     alloca $ \valPtr -> do
-                        success <- mdb_cursor_get' move cursor keyPtr valPtr
+                        move' <- case move of
+                          MoveTo k -> do
+                            key' <- encode k
+                            keyPtr `poke` key'
+                            return MDB_FIRST
+                          MoveNext ->
+                            return MDB_NEXT
+                          MoveGetItem ->
+                            return MDB_GET_CURRENT
+                        
+                        success <- mdb_cursor_get' move' cursor keyPtr valPtr
                         if success
                         then do
                             key  <- peek keyPtr

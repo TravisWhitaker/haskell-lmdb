@@ -9,7 +9,8 @@ import Database.LMDB.Interpreter.LMDB
 import Database.LMDB.TxM
 import Database.LMDB
 
-import Data.ByteString
+import qualified Data.ByteString
+import Data.ByteString (ByteString, pack)
 import Data.Monoid
 
 import Test.QuickCheck
@@ -37,6 +38,18 @@ main = do
             -- * Sanity check is slow, but this is not.
             quickCheck $ \key ->
                 Data.ByteString.length (pack key) >= 0
+                
+            quickCheck $ \key vals ->
+                let
+                  k  =     pack key
+                  vs = map pack vals
+                  command = do
+                    forM_ (take 10 vs) $ \v ->
+                        put dbi (bs k) (bs v)
+                        
+                    gets dbi k
+                    
+                in test command (map bs vs)  env
     res' <- res
     result res'
 
