@@ -12,6 +12,7 @@ import Database.LMDB
 import qualified Data.ByteString
 import Data.ByteString (ByteString, pack)
 import Data.Monoid
+import Data.List
 
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
@@ -23,7 +24,7 @@ main :: IO ()
 main = do
     (_, res) <- forkOS $
         withEnv def "database" (1024 * 1024) $ ReaderT $ \env ->
-        withDB  def (Named "other") env      $ ReaderT $ \dbi -> do
+        withDB  def { dupSort = True, dupFixed = True } (Named "other") env      $ ReaderT $ \dbi -> do
             -- * Sanity check: read after write.
             quickCheck $ \key value ->
                 let
@@ -33,7 +34,7 @@ main = do
                     _ <- put dbi (bs k) (bs v)
                     get dbi (bs k)
 
-                in test command (Just (bs v)) env
+                in test id command (Just (bs v)) env
 
             -- * Sanity check is slow, but this is not.
             quickCheck $ \key ->
@@ -44,23 +45,24 @@ main = do
                   k  =     pack key
                   vs = map pack vals
                   command = do
-                    forM_ (take 10 vs) $ \v ->
+                    forM_ (take 5 vs) $ \v ->
                         put dbi (bs k) (bs v)
                         
                     gets dbi k
                     
-                in test command (map bs vs)  env
+                in test sort command (map bs vs)  env
     res' <- res
     result res'
 
 -- * Run given DSL expression in a transaction.
 test
-    :: Eq a
-    => TxT LMDB IO a
+    :: Eq b
+    => (a -> b)
+    -> TxT LMDB IO a
     -> a
     -> Env mode
     -> Property
-test command expected env' =
+test project command expected env' =
     monadicIO $ do
         res <- run $ withTransaction (env', []) command
-        assert (res == expected)
+        assert (project res == project expected)

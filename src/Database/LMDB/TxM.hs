@@ -63,8 +63,7 @@ data TxOp i m x where
 
 data TxMove i k
     = MoveTo k
-    | MoveNext
-    | MoveGetItem
+    | MoveNext k
 
 instance Functor (TxOp i m) where
     fmap f (Lift m x)          = Lift m (f . x)
@@ -100,16 +99,17 @@ gets
     => TxDB i k v -> k -> TxT i m [v]
 gets db k = do
     cur <- openCursor db
-    mp  <- moveCursor cur (MoveTo k)
-    case mp of
-      Nothing ->
-        return []
-      Just (Pair k v) -> do
-        vs <- retrieveAllAt cur
-        return (v : vs)
+    mp  <- trace "BEFORE" $ moveCursor cur (MoveTo k)
+    trace "AFTER" $
+        case mp of
+          Nothing ->
+            return []
+          Just (Pair k v) -> do
+            vs <- retrieveAllAt cur
+            return (v : vs)
   where
     retrieveAllAt cur = do
-        maybePair <- moveCursor cur MoveNext
+        maybePair <- moveCursor cur (MoveNext k)
         trace (show maybePair) $
             case maybePair of
               Nothing -> do

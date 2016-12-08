@@ -96,11 +96,11 @@ instance TxInterp LMDB where
                           MoveTo k -> do
                             key' <- encode k
                             keyPtr `poke` key'
-                            return MDB_FIRST
-                          MoveNext ->
-                            return MDB_NEXT
-                          MoveGetItem ->
-                            return MDB_GET_CURRENT
+                            return MDB_SET
+                          MoveNext k -> do
+                            key' <- encode k
+                            keyPtr `poke` key'
+                            return MDB_NEXT_DUP
                         
                         success <- mdb_cursor_get' move' cursor keyPtr valPtr
                         if success
