@@ -69,15 +69,15 @@ instance TxInterp LMDB where
                 success <- liftIO $ mdb_put' flags trans db key' value'
                 continue success
 
-              Upsert (DB db) key value continue -> do
-                key'    <- encode key
-                value'  <- encode value
-                -- FIXME(kir): I'm not sure about that flag.
-                -- TODO: write tests
-                let flags' = flags `setFlag` MDB_APPENDDUP
-                success <- liftIO $ mdb_put' flags' trans db key' value'
-                continue success
-
+            --   Upsert (DB db) key value continue -> do
+            --     let flags' = flags `setFlag` MDB_APPENDDUP
+            --     local (\(t, _) -> (t, flags')) $ do
+            --         success <- interpTxT $ do
+            --             cur <- openCursor (DB db)
+            --             moveCursor cur (MoveTo key)
+            --             putCursor cur key value
+            --         continue success
+              -- 
               Del (DB db) key continue -> do
                 key'    <- encode key
                 success <- liftIO $ mdb_del' trans db key' Nothing
@@ -97,7 +97,7 @@ instance TxInterp LMDB where
                             key' <- encode k
                             keyPtr `poke` key'
                             return MDB_FIRST
-                          MoveNext k -> do
+                          MoveNext -> do
                             --key' <- encode k
                             --keyPtr `poke` key'
                             return MDB_NEXT_DUP
@@ -130,6 +130,3 @@ instance TxInterp LMDB where
 
               Abort -> do
                 error "is there any meaning here?"
-
-        encode thing = liftIO $ S.put thing return
-        decode thing = liftIO $ S.get thing

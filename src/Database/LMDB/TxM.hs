@@ -52,7 +52,7 @@ data TxOp i m x where
     Clear       :: TxInterp i                           => (TxDB i) k v -> x -> TxOp i m x
     Get         :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> ((Maybe v) -> x) -> TxOp i m x
     Put         :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
-    Upsert      :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
+    -- Upsert      :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> (Bool -> x) -> TxOp i m x
     Del         :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> (Bool -> x) -> TxOp i m x
     OpenCursor  :: (TxInterp i)                         => (TxDB i) k v -> (((TxCursor i) k v) -> x) -> TxOp i m x
     MoveCursor  :: (TxInterp i, Stowable k, Stowable v) => (TxCursor i) k v -> (TxMove i) k -> ((Maybe (Pair k v)) -> x) -> TxOp i m x
@@ -63,7 +63,7 @@ data TxOp i m x where
 
 data TxMove i k
     = MoveTo k
-    | MoveNext k
+    | MoveNext
 
 instance Functor (TxOp i m) where
     fmap f (Lift m x)          = Lift m (f . x)
@@ -71,7 +71,7 @@ instance Functor (TxOp i m) where
     fmap f (Clear d x)         = Clear d (f x)
     fmap f (Get d k x)         = Get d k (f . x)
     fmap f (Put d k v x)       = Put d k v (f . x)
-    fmap f (Upsert d k v x)    = Upsert d k v (f . x)
+    -- fmap f (Upsert d k v x)    = Upsert d k v (f . x)
     fmap f (Del d k x)         = Del d k (f . x)
     fmap f (OpenCursor d x)    = OpenCursor d (f . x)
     fmap f (MoveCursor c m x)  = MoveCursor c m (f . x)
@@ -99,30 +99,32 @@ gets
     => TxDB i k v -> k -> TxT i m [v]
 gets db k = do
     cur <- openCursor db
-    mp  <- trace "BEFORE" $ moveCursor cur (MoveTo k)
-    trace "AFTER" $
-        case mp of
-          Nothing ->
-            return []
-          Just (Pair k v) -> do
-            vs <- retrieveAllAt cur
-            return (v : vs)
+    mp  <- moveCursor cur (MoveTo k)
+    case mp of
+      Nothing ->
+        return []
+      Just (Pair k v) -> do
+        vs <- retrieveAllAt cur
+        return (v : vs)
   where
     retrieveAllAt cur = do
-        maybePair <- moveCursor cur (MoveNext k)
-        trace (show maybePair) $
-            case maybePair of
-              Nothing -> do
-                return []
-              Just (Pair _ v) -> do
-                vs <- retrieveAllAt cur
-                return (v : vs)
+        maybePair <- moveCursor cur MoveNext
+        case maybePair of
+          Nothing -> do
+            return []
+          Just (Pair _ v) -> do
+            vs <- retrieveAllAt cur
+            return (v : vs)
 
 put :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> TxT i m Bool
 put db k v = liftF $ Put db k v id
 
 upsert :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> v -> TxT i m Bool
-upsert db k v = liftF $ Upsert db k v id
+upsert db k v = do
+    cur <- openCursor db
+    _   <- moveCursor cur (MoveTo k)
+    res <- putCursor cur k v
+    return res
 
 del :: (TxInterp i, Stowable k, Stowable v) => (TxDB i) k v -> k -> TxT i m Bool
 del db k = liftF $ Del db k id

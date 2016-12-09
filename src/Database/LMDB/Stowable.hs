@@ -2,9 +2,12 @@
 
 module Database.LMDB.Stowable (
     Stowable(..)
+  , encode
+  , decode
   ) where
 
 import Control.DeepSeq
+import Control.Monad.IO.Class
 
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
@@ -15,6 +18,8 @@ import Database.LMDB.Internal.Raw
 import Data.ByteString   as B
 import Data.Text
 import Data.Text.Foreign as T
+
+import Debug.Trace
 
 class NFData a => Stowable a where
     get :: MDB_val -> IO a
@@ -27,11 +32,19 @@ class NFData a => Stowable a where
 -- more instances
 
 instance Stowable ByteString where
-    get (MDB_val size ptr) = B.packCStringLen (castPtr ptr, fromIntegral size)
-    put bstr cont = bstr `B.useAsCStringLen` \(ptr, size) ->
+    get (MDB_val size ptr) = do
+        str <- B.packCStringLen (castPtr ptr, fromIntegral size)
+        print ("decode", size, str)
+        return str
+        
+    put bstr cont = bstr `B.useAsCStringLen` \(ptr, size) -> do
+        print ("encode", size, bstr)
         cont $ fromIntegral size `MDB_val` castPtr ptr
 
 instance Stowable Text where
     get (MDB_val size ptr) = T.peekCStringLen (castPtr ptr, fromIntegral size)
     put bstr cont = bstr `T.withCStringLen` \(ptr, size) ->
         cont $ fromIntegral size `MDB_val` castPtr ptr
+
+encode thing = liftIO $ put thing return
+decode thing = liftIO $ get thing

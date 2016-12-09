@@ -6,13 +6,18 @@ import Control.Monad.Reader
 import Control.Concurrent.Thread (result, forkOS)
 
 import Database.LMDB.Interpreter.LMDB
+import qualified Database.LMDB.Stowable as Store (encode, decode)
 import Database.LMDB.TxM
 import Database.LMDB
 
 import qualified Data.ByteString
-import Data.ByteString (ByteString, pack)
+import Data.ByteString.Char8 (ByteString, pack)
 import Data.Monoid
-import Data.List
+import Data.List (sort, nub)
+
+import GHC.Exts
+
+import Prelude hiding (drop)
 
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
@@ -25,32 +30,57 @@ main = do
     (_, res) <- forkOS $
         withEnv def "database" (1024 * 1024) $ ReaderT $ \env ->
         withDB  def { dupSort = True, dupFixed = True } (Named "other") env      $ ReaderT $ \dbi -> do
-            -- * Sanity check: read after write.
-            quickCheck $ \key value ->
+            -- quickCheck $ \bytes ->
+            --     monadicIO $ do
+            --         let victim = (pack bytes)
+            --         enc <- run $ Store.encode victim
+            --         dec <- run $ Store.decode enc
+            --         
+            --         return (dec == victim)
+            
+            quickCheck $
                 let
-                  k = pack key
-                  v = pack value
+                  fs = fromString
+                  write = upsert
                   command = do
-                    _ <- put dbi (bs k) (bs v)
-                    get dbi (bs k)
-
-                in test id command (Just (bs v)) env
-
-            -- * Sanity check is slow, but this is not.
-            quickCheck $ \key ->
-                Data.ByteString.length (pack key) >= 0
-                
+                    clear dbi
+                    write dbi (fs "a") (fs "q")
+                    write dbi (fs "a") (fs "uiop")
+                    write dbi (fs "a") (fs "we")
+                    write dbi (fs "a") (fs "rty")
+                    write dbi (fs "a") (fs "asdfg")
+                    gets dbi (fs "a")
+                in
+                    test id command
+                        (map fs ["q", "we", "rty", "uiop", "asdfg"])
+                        env
+        
             quickCheck $ \key vals ->
                 let
-                  k  =             pack key
-                  vs = take 5 (map pack vals)
                   command = do
-                    forM_ vs $ \v ->
-                        put dbi (bs k) (bs v)
+                    clear dbi
+                    forM_ vals $ \val ->
+                        put dbi key (val :: ByteString)
                         
-                    gets dbi k
+                    gets dbi (key :: ByteString)
                     
-                in test sort command (map pack vals) env
+                in test (nub . sort) command vals env
+            -- * Sanity check: read after write.
+            -- quickCheck $ \key value ->
+            --     let
+            --       k = pack key
+            --       v = pack value
+            --       command = do
+            --         clear dbi
+            --         _ <- put dbi (bs k) (bs v)
+            --         get dbi (bs k)
+            -- 
+            --     in test id command (Just (bs v)) env
+            -- 
+            -- -- * Sanity check is slow, but this is not.
+            -- quickCheck $ \key ->
+            --     Data.ByteString.length (pack key) >= 0
+                
     res' <- res
     result res'
 
@@ -67,6 +97,16 @@ test
 test project command expected env' =
     monadicIO $ do
         res <- run $ withTransaction (env', []) command
-        run $ print ("res", res)
-        run $ print ("exp", expected)
+        run $ print ("res", project res)
+        run $ print ("exp", project expected)
+        run $ print ("==")
         assert (project res == project expected)
+        
+newtype Letters = Letters { getLetters :: [Char] }
+
+instance Arbitrary Letters where
+    arbitrary = Letters <$> do
+        listOf1 $ suchThat arbitrary $ flip elem $ ['a'.. 'z'] ++ "-"
+        
+instance Arbitrary ByteString where
+    arbitrary = (fromString . getLetters) <$> arbitrary
